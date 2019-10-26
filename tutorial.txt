@@ -1,0 +1,306 @@
+先来一个问题
+
+这种的原因是什么？
+根本原因是因为 两个仓库的历史不一样
+
+会发生的场景：  你新建了一个github仓库，添加了license和readme， 但你本地已经有代码仓库了
+你想上传
+
+解决办法： 一. git push -f origin master  强制覆盖github的历史，缺点  github上的历史和文件全部丢失！！！！
+解决方法： 二 git pull 
+--set-upstream-to   == -u
+		refusing to merge unrelated histories  告诉你  两个仓库历史不一样  也就是说不是一个仓库！
+			--allow-unrelated-histories
+
+这是最常见的问题了
+
+你有不懂得随时问
+
+echo 你知道吧  输出。  git hash-object 计算内容的sha1 hash  
+		   	--stdin 接收从标准输入  来的数据  也就是 “hello world”
+			-w 写入文件
+git里所有文件都经过zlib压缩了，cat-file命令 帮你解压缩了 再cat出来文件的内容， 
+cat你知道是干什么的吗？
+
+现在 这个文件夹是空的对吧
+
+git 里有三片区域 1. working area 就是你的目录  |  staging  / index area 暂存区 |    git repository  .git目录 git真正托管
+
+git cat-file -t type  -p pretty-print
+
+ git update-index --add --cacheinfo 100644 3b18e512dba79e4c8300dd08aeb37f8e728b8dad hello.txt
+告诉git blob的信息  100644 100表示普通文件  644 linux的权限 hello.txt 文件名
+
+git write-tree  把index中的所有tree写入文件
+ 		注意： 我所说的写入文件，表示已经进入 （git repository  .git目录 git真正托管） 
+只要写入.git/objects 目录，就是进入 （git repository  .git目录 git真正托管） 
+
+意思是：暂存区和 git repository都是在.git里？
+这个就是index（缓存区） 我也不知道怎么查看这个文件，反正他就是缓存区
+
+到目前为止，我都在用hash的缩写，你也许会问，git怎么知道缩写的完整形式
+	 git rev-parse 68aba  git内部通过这个来查询解析
+ 演示一下 从创建文件，你会发现目前我已经完成了 写入缓存区  和commit，只是没有索引（branch）来找到
+
+我忘了你是怎么创建并且加入暂存区的了，以后我总结归纳，其是掌握概念就好了
+
+.git/refs  所有索引所在目录  heads： branch	可读写
+		         tags： tag                        只读
+		就像c的指针   char*  vs  char* const  这个理解了吧？
+		你会发现  HEAD指向的文件（branch）不存在
+		这就是git的分支了  一个可读写的指针  里面存着指向commit对象的地址（sha1 hash）
+
+问问题列表：
+
+两个问题：$ cat .git/HEAD
+ref: refs/heads/master
+明明就引用，为什么刚看目录不存在	默认空仓库不会有任何branch  在你第一次commit的时候根据你的.git/HEAD 创建
+
+$ git update-ref refs/heads/master f685a	这就是commit内部调用的其中一个命令 所有你调用的比如add  commit都是很多内部命令的合集
+			检查 .git/HEAD指向的branch存不存在  不存在创建新的   存在就修改  就像修改指针的地址一样
+执行这个又会有文件？   update-ref   update reference  更新索引  懂了吗   这么说你提交了一次？那commit对象现在不是有两个了吗
+	注意： void* master = & commit; 会有两个commit吗
+  加上刚刚演示那个 这些内部命令我不懂，我需要掌握add，commit 还有分支的一些概念
+	我在演示的就是内部原理   懂了原理不需要记命令  知道大概过程就好
+
+
+
+
+都是第一个字母。。你演示下
+那我演示下  从HEAD  找到blob
+一个指向一个
+ 那刚刚的git checkout 索引 -- 文件   把索引中的文件拿出来  放入到working tree 链表发生什么
+	从一开始  我创建blob，就没在working tree创建hello.txt， 到最后  我 checkout的时候
+	我告诉git，  git checkout HEAD -- hello.txt 从HEAD指向的索引里   找到 工作目录的根目录下的hello.txt这个文件，
+	写入到working tree里，HEAD指向了master  master又指向了commit f685a， commit又有一个根目录（根tree object），
+	指向了一个tree  ，根tree里有一个文件名字是hello.txt，正好和我需要的对应 hello.txt， 就去这个blob，提取内容hello world，
+	根据tree里的信息创建文件hello.txt，权限是644，100代表普通文件，然后写入hello world。搞定 rw r r 就是644， 明白了吗？
+
+
+第一个commit
+	$ cat .git/refs/heads/master
+	f685aca67c8ef52e6ffd3ba2eb69e121833e8527
+
+e48df2 新blob
+bd03fb 新commit
+697d7b 新tree
+
+git add  文件
+从文件中读取内容  写入blob
+相当于：
+cat 文件 | git hash-object -w --stdin 
+
+
+git commit 就是刚才那一大堆命令合集
+	update-index
+	write-tree
+	commit-tree
+
+
+如你所见  第一个commit没有parent， 其他的都有最少一个parent多个parent出现在merge的情况下
+	一个tree可以有多个blob
+
+发没发现跟刚才的情况一样？可以把上面的一起演示下，这就不用重复了  你翻一下 
+如果真正删除了 tree和commit对象就会减少吗  所有对象都是只读的生成了就不会删除，除非 【一个对象没有被索引，就会在一段时间后（一般2周）被清理！】
+
+可是文件都不存在了，tree不会减少那个sha 1hash?
+
+你删除了一个文件，git会在commit的时候新建一个tree object，里面不包含这个blob就行了其他的不动
+
+我给你演示一下
+怎样才能有多个parent, merge
+演示下checkout的情况 等会
+tree也可以指向tree？ 你提交的不是dir/.gitkeep文件吗
+.gitkeep，是git的占位文件，空文件夹git不会托管，所有要有这个文件告诉git，我想保留这个空文件夹
+
+好的，我想了解分支的东西
+来了
+你想象一个树结构， 分支就是指向任意节点的指针，tag就是指向任意节点的const指针不可移动 go ahead
+
+为什么在master分支也能查看dev的commit对象？  因为对象是客观存在的，不是指针改变指向就查看不了了 
+这里你就会看到 master指向的和dev指向的里的parent共用了同一个commit
+改变hello.txt  a5441ff4ec58dc5bc305aeb548c01f98e2cf7cf1 这是变化的？
+
+永远都在创建新的，已经存在的是只读的，不会碰
+
+
+到这里， HEAD -》 master branch -》 commit f685a -》 tree  68aba6 -》 blob  3b18e5 
+git 仓库就完整了， 但是working tree和git仓库不一样？ 怎么办
+	 git checkout HEAD -- hello.txt
+	 git checkout 索引 -- 文件   把索引中的文件拿出来  放入到working tree
+	
+	就是这种单向链表 链表我懂，你画的这个我不懂，。还有， 把索引中的文件拿出来  放入到working tree 这句话
+	返回了working tree 不应该 给git status 会有红色的文件吗 （放回working area = working tree就是你的工作目录）？
+		
+正式开始： 
+0. git里 sha1 hash就是万物的编号（相当于c语言的地址），有了部分hash，就可以唯一索引一个对象！
+1. git的基本对象（4个）  blob  ：  存储所有数据的对象， 只存数据，不关心其他比如数据所在目录，数据所在文件的信息
+		这样，两个文件有相同的数据，就不用存两遍，索引这一个blob就可以了
+		tree: 目录 包含目录信息，和目录里的文件信息
+		commit： commit对象， 一个目录， 也就是根目录了 作者信息   提交人的信息  commit 信息
+		tag：这个不用多了解，我想了解tag，等会，先完成下面的再介绍
+2. git里面除了4大对象，几乎全是索引（指针）  ，【一个对象没有被索引，就会在一段时间后（一般2周）被清理！】
+现在 blob被tree索引，tree被commit索引，那commit该被谁索引呢?
+答案是： branch
+
+HEAD： 特殊索引，永远指向你当前的操作的commit对象
+		这就是索引文件的内容  ref 
+
+
+分支： 
+	分支，就是指向commit对象的 索引（指针） -》 可读写（移动）
+	创建分支： git branch name  从当前 指向的commit对象 创建 
+		 git checkout -b name	从当前 指向的commit对象 创建  并checkout
+		git branch --delete name 删除分支 （不碰已存在的对象）
+	分支策略： Fast forward： 很简单， 
+		dev的commit parent是master指向的， 直接移动master指针，指向dev
+
+	这就是git与众不同的地方，git只关心内容，不关心patch，你修改了什么git完全不关心，所有你每次add，都是添加完整的内容
+	到git 暂存区  subvertion就是每次只存你改了什么，这样checkout就会很慢
+	git的安全性：hash( hash（hash(内容) -> blob + tree的内容）->tree + commit的内容) -> commit， 这就保证如果有病毒，修改了
+	你的文件，即使是一个bit，都会导致hash和历史里的对象不一样，就保证了安全
+
+
+	还有一个rebase？
+	fast forward 其实就是一种rebase
+	看明白了吗  一切都是移动指针
+为啥是虚线因为  HEAD没指向任何branch 刚刚不是指向了a吗   注意： 我是git branch 创建的a，没有checkout
+虚线就是这个对象没有被任何指针引用，会被git给干掉
+我给你演示一下
+
+回溯到之前commit的状态是不是只读的你可以修改（我指的是在那里新建commit  parent是你head所在位置
+现在是什么情况 head指向了新commit对象  这个对象没有分支指向，会被git干掉 
+能给他创建一个分支吗  用图演示下回溯再重新提交？rebase不是很理解
+创建的临时commit是不是可以看到master的log？
+知道临时分支为什么虚线吗？  因为rebase把他的指针移动走了， 他没索引，会被git干掉
+可以把tmp回溯到head当前的commit？
+只提交四次，为啥会有五个圈  这是他为了演示给的方便根git无关。。再演示下。。。
+注意看动画
+这里没了？  虚线表示没有指针指向了
+git checkout -b temp刚刚不是创建分支了吗
+不是合并后再移动吗那是merge。。。
+merge是创建一个commit  有他俩的改变， 指向他俩
+a10d710现在有指针指向了，不会被干掉了  新创建的tempcommit指向了他
+好了我要开始问了
+
+举个实用点的例子？比如公司开发 master dev 啥啥啥的分支怎么分配？最好演示。。。。怎么push，又怎么pull，谁有权限。。。
+git本身没有权限功能
+
+
+这就是github上的样子，没有working tree  staging
+
+working tree （你写代码的地方）      |             index/staging area   暂存区  	|      git 仓库
+
+bare仓库， 没有working tree； 进去直接就是git仓库文件夹
+
+意思是romte被当成远程仓库使用吗？ 对啊 所有是bare仓库
+不需要working tree
+有个问题，如果有小伙伴拿我代码 怎么弄 是pull romte还是pullxiaoming， 都可以  一会演示
+
+push之后，remote就和本地同步了
+
+git pull其实是两个命令的合集： git fetch 和 git merge
+注意： 这次不用git pull 了
+
+git fetch？啥意思
+
+git fetch 把remote里新的commit 拉去下来，但不帮你merge
+看现在没有xiaohua.txt吧
+这就是git pull干的事了
+有个问题，比如在开发分支dev，我是dev-a，在一个主机，那我是不是也可以用master分支
+
+你的master不等于我的master 他这里怎么能使用
+
+因为git pull 帮你把他的master合并到了你的master上了，你更改的还是你自己的master  所以不推荐git pull，自己fetch自己合并
+举个例子，用局域网的一台服务器做romte，小组开发，提交(push)的时候怎么区分（如果大家都是用master）
+
+
+
+git push 远程服务器  本地分支:远程分支
+
+
+
+这里没有tmp分支？当然   只是重命名而已  
+
+那如果有的话，我可以在master提交tmp？你的仓库和他的是独立的
+不同的分支是不同的仓库吗你怎么就是不理解呢
+
+你有一个链表   我拷贝一份，   你用你的master指针修改， 我用我的 修改   哪里有什么冲突问题
+
+我可能还是对本地仓库和远程仓库这概念不熟
+
+
+不同人的master是不同的，现在
+你merge谁的  你的master就会和谁的同步 你也可以不merge，新建个本地的branch来存放别人的commits
+
+跟github那个一个问题，两个根本不同的仓库（没有共同的历史）
+现在你把小华的master给取了个别名  存在本地了
+只是你自己的别名，跟别人无关
+红色这里是远程仓库存放的分支对把   只是你把他们的修改下载下来，用一个指针指着
+那我在本地修改，远程的也会跟着改？  不会
+你爱怎么改怎么改，没push之前  跟别人无关  这就是去中心化的好处 那如果push呢
+
+这个不应该是远程仓库吗，怎么看不到
+我没用远程仓库
+xiaoming直接从xiaohua和xiaozhang那里提取代码  没有中心仓库  这种就是开发小组  的场景！那这个要在本机哒服务器把
+所有不方便，一般还是会用一个中心的仓库  搭建服务器  局域网内使用
+这个中心仓库是不是只有git的仓库  对   裸仓库
+那等真正上线，这个仓库是不是得push   你没有push权限，，，是公司的主仓库管理从你这里  fetch，你是不知道主仓库的地址的
+
+本地仓库都必须有master分支吗， 默认的名字，可以改
+中心仓库是不是有很多分支，比如test，dev，等等 那我push到中心仓库，可以push到指定的分支吗，比如dev？可以
+
+这样子问，如果连接到github，不会自动创建remote吧
+你到时候试试不就知道了
+
+
+问题一: 为什么要用前两个字母或数字做文件夹而不是直接存文件
+i donot know
+防止一个目录下面文件太多， 有的文件系统同一目录文件过多会影响性能 但是这里就目录过多了，每个目录都会有很多文件
+总体来讲  同一目录下文件还是减少了
+
+问题二： 这么多文件  网络传输性能好低
+答  ： git gc --aggressive
+打包文件      会立即删除所有未被指针指向的对象 reflog指向的不会被删除
+
+问题三： 如果我错误的操作导致一个commit的索引丢失了 既然没索引了  我怎么找回来
+答： git reflog  记录所有HEAD的更改记录
+
+问题四： 如果我commit之后发现  漏掉了一个文件怎么办？？
+git commit --amend --no-edit  替换上一个commit 
+
+问题五： 如果push之前，我发现  我的commit历史太乱了怎么办
+
+任意指针^ 表示上一个commit
+^^上两个  以此类推
+
+任意指针~4  上4个
+
+squash 和上一个commit合并
+
+
+比如我提交三次，有三个commit 的sha hash，我又回退到第一次提交，那么当我push的时候，后两次会有记录吗（根据 commit -m）
+默认 不会， 只会提交被索引的commit和其他对象
+
+被合并了
+
+
+问题六： 如果我修改了代码   提交了（commit），发现提交错了branch怎么办？
+你试着回答一下
+
+那就去和主管说啊  说什么  你又没push
+那就退回到这个提交sha的前一个提交  或者删除？
+
+答案： cherrypick
+比如 这个e8b2ef07c30271d5cff2989033f7e75f6d732392， 我想搞到dev去
+这样就行了就是把master提交剪切到dev，  没有剪切，， 只是复制了修改  新建了一个commit
+master没见到e8b2ef07c3027了  因为我reset了
+还能前进一个commit吗  当然了   就是移动指针而已
+
+master = master->parent;  前提是master的parent只有一个
+
+你觉得该怎么填
+其他的忘了 我都是按照这个提示来
+
+你还有什么问题吗
+我自己操作
